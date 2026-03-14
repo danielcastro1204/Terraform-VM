@@ -1,96 +1,74 @@
-### Daniel Alejandro Castro Escobar - A00398005
+## Procedimiento de despliegue de una máquina virtual Linux en Azure con Terraform
 
-**1. Obtención del código fuente**
+## Daniel Alejandro Castro Escobar - A00398005
 
-Inicialmente, se clona el repositorio de GitHub que contiene los archivos de configuración de Terraform. Esto permite obtener localmente las definiciones de infraestructura necesarias para el despliegue. El comando empleado es:
+### 1. Estructura de los archivos de configuración
 
-```bash
-git clone https://github.com/ChristianFlor/azfunction-tf.git
-```
 
-![Clonación del repositorio](images/Image1.png)
+El primer paso consiste en definir la infraestructura como código mediante Terraform. Para este propósito, se crean los siguientes archivos:
 
-**2. Acceso al directorio de trabajo**
+- **`main.tf`**: Contiene la configuración del proveedor `azurerm` y la definición de los recursos, como grupo de recursos, red virtual, subred, dirección IP pública, grupo de seguridad de red, interfaz de red y la máquina virtual Linux.
 
-Una vez clonado el repositorio, se navega al directorio que alberga el archivo principal de Terraform y los archivos complementarios, para que los comandos de Terraform se ejecuten en el contexto correcto.
+![Archivo main.tf](images/Image1.png)
 
-```bash
-cd D:\Documentos\Universidad\Semestre 8\Plataformas II\VM Terraform>
-```
+- **`variables.tf`**: Declara las variables necesarias, como `location`, `admin_username` y `admin_password` (esta última marcada como `sensitive`).
 
-![Acceso al directorio](images/Image2.png)
+![Archivo variables.tf](images/Image2.png)
 
-**3. Inicialización de Terraform**
+- **`terraform.tfvars`**: Asigna los valores deseados a las credenciales de administrador.
 
-Se ejecuta el comando `terraform init` con el fin de preparar el entorno de trabajo. Este comando descarga los proveedores necesarios y configura el backend para el estado de Terraform.
+![Archivo terraform.tfvars](images/Image3.png)
+
+- **`outputs.tf`**: Define las salidas de la IP pública de la VM y el comando SSH para conectarse.
+
+![Archivo outputs.tf](images/Image4.png)
+
+Esta organización de archivos garantiza la modularidad de la solución, lo permite parametrizar el despliegue y mantener la separación entre configuración y datos sensibles.
+
+### 2. Inicialización del entorno
+
+
+Una vez definida la infraestructura, se ejecuta el siguiente comando.
 
 ```bash
 terraform init
 ```
 
-![Inicialización de Terraform](images/Image3.png)
+Que descarga el proveedor de Azure (`azurerm`) y prepara el directorio de trabajo, creando el archivo de bloqueo y el directorio `.terraform`.
 
-**4. Despliegue inicial**
+### 3. Despliegue inicial
 
-A continuación, se procede a ejecutar `terraform apply` para crear los recursos definidos. Durante la ejecución, Terraform solicita confirmación mostrando el plan de cambios. Es necesario responder afirmativamente (`yes`). Sin embargo, el despliegue falla debido a un error relacionado con la suscripción de Azure y la zona geográfica predeterminada.
 
-![Despliegue de la infraestructura](images/Image4.png)
-![Respuesta afirmativa](images/Image5.png)
-![Error de región](images/Image6.png)
-
-En este caso, el error se debe a que la región configurada por defecto en los archivos de variables no está habilitada para la suscripción de estudiante utilizada.
+Al ejecutar `terraform apply`, Terraform muestra el plan de creación de recursos y se confirma con `yes`. Al finalizar el despliegue, Terraform imprime las salidas definidas: la IP pública asignada y el comando SSH para acceder a la máquina virtual. Se intenta conectar a la VM mediante:
 
 ```bash
-terraform apply
+ssh danielcastro@23.102.125.172
 ```
 
-**5. Corrección de la región**
+Sin embargo, la conexión falla con el mensaje `Permission denied`, a pesar de introducir correctamente la contraseña que fue definida en el archivo de configuración.
 
-Para solucionar el error, se modifica la variable `location` en el archivo `variables.tf`, estableciendo la región East US 2 (`eastus2`), que es compatible con la suscripción de estudiante y posee la disponibilidad de servicios requerida.
+![Error obtenido](images/Image5.png)
 
-![Clonación del repositorio](images/Image7.png)
+### 4. Diagnóstico del error
 
-Tras este ajuste, se repite el comando:
+Para identificar la causa del problema, se realiza una prueba de conectividad al puerto 22 desde PowerShell:
 
 ```bash
-terraform apply
+Test-NetConnection -ComputerName 23.102.125.172 -Port 22
 ```
 
-Ahora sí permite completar exitosamente la creación de la infraestructura.
+El resultado indica `TcpTestSucceeded : True`, confirmando que el puerto 22 se encuentra abierto y accesible.
 
-**6. Obtención de URL del servicio desplegado**
+### 5. Solución
 
-Al finalizar el despliegue, Terraform muestra en la salida los valores definidos en `outputs.tf`. Entre ellos, se encuentra la URL pública del recurso creado, que permite acceder al servicio en ejecución.
+Explorando otras posibles razones del error, se determina que la causa de que no reconozca la contraseña podría deberse a que esta incluye un caracter que no se incluye en el inglés estándar, por lo que el proceso de creación de la VM en Azure podría no interpretarlo correctamente. Para esto, se decide destruir la máquina virtual generada con `terraform destroy` y levantarla nuevamente con una contraseña nueva que sí cumpla los requisitos de Azure. La contraseña es agregada en el archivo `terraform.tfvars`.
 
-![Obtención de URL](images/Image8.png)
+Tras este ajuste, se ejecuta `terraform apply` y la infraestructura se despliega nuevamente sin errores. Finalmente, se utiliza el comando SSH proporcionado por Terraform para acceder a la máquina virtual, introduciendo la nueva contraseña y logrando la conexión sin inconvenientes. De esta manera, se confirma que el problema quedó resuelto y el despliegue funciona correctamente.
 
-**7. Verificación del funcionamiento de la aplicación**
+![Acceso a la VM](images/Image6.png)
 
-Al acceder mediante un navegador a la URL, se observa un mensaje indicando que la función HTTP se había ejecutado correctamente:
+### 6. Verificación
 
-> "Esta función HTTP se ejecutó correctamente. Pase un nombre en la cadena de consulta o en el cuerpo de la solicitud para obtener una respuesta personalizada."
+Se accede al portal de Azure y se inspecciona el apartado de las VMs. Allí se confirma la presencia de la VM recién levantada.
 
-Así se comprueba que el recurso de tipo Function App está operando y responde a peticiones HTTP.
-
-![Comprobación de funcionamiento](images/Image9.png)
-
-**8. Inspección en Azure Portal**
-
-Se ingresa al portal de Azure y se localiza el grupo de recursos creado, cuyo nombre fue definido en la configuración.
-
-![Resource Group creado](images/Image10.png)
-
-Dentro de este grupo se observan todos los recursos generados automáticamente por Terraform:
-
-- Storage Account  
-- App Service Plan  
-- Function App  
-
-Esto evidencia que la infraestructura desplegada coincide con la definida en el código.
-
-**9. Acceso al dominio de la Function App**
-
-Desde la página de la Function App en el portal, se accede a su dominio predeterminado, comprobando nuevamente que la aplicación está disponible públicamente y responde como se espera.
-
-![Página de la Function App](images/Image11.png)
-![Acceso a dominio predeterminado](images/Image12.png)
+![VM en Azure Portal](images/Image7.png)
