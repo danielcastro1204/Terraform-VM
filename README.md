@@ -7,23 +7,26 @@
 
 El primer paso consiste en definir la infraestructura como código mediante Terraform. Para este propósito, se crean los siguientes archivos:
 
-- **`main.tf`**: Contiene la configuración del proveedor `azurerm` y la definición de los recursos, como grupo de recursos, red virtual, subred, dirección IP pública, grupo de seguridad de red, interfaz de red y la máquina virtual Linux.
+- **`main.tf`**: Configura el proveedor `azurerm` y orquesta la infraestructura mediante módulos: grupo de recursos, red, IP pública, NIC y máquina virtual.  
+  ![Archivo main.tf](images/Image1.png)
 
-![Archivo main.tf](images/Image1.png)
+- **`variables.tf`**: Declara las variables de entrada necesarias, como `location`, `admin_username` y `admin_password` (sensible).  
+  ![Archivo variables.tf](images/Image2.png)
 
-- **`variables.tf`**: Declara las variables necesarias, como `location`, `admin_username` y `admin_password` (esta última marcada como `sensitive`).
+- **`terraform.tfvars`**: Asigna valores concretos a las credenciales de administrador y otras variables.  
+  ![Archivo terraform.tfvars](images/Image3.png)
 
-![Archivo variables.tf](images/Image2.png)
+- **`outputs.tf`**: Define las salidas: la IP pública de la VM y el comando SSH para conectarse.  
+  ![Archivo outputs.tf](images/Image4.png)
 
-- **`terraform.tfvars`**: Asigna los valores deseados a las credenciales de administrador.
+- **Módulos (`modules/`)**: Contiene submódulos reutilizables que encapsulan recursos específicos:
+  - **`resource_group`**: crea el grupo de recursos.
+  - **`network`**: red virtual, subred y grupo de seguridad de red (NSG).
+  - **`public_ip`**: dirección IP pública.
+  - **`nic`**: interfaz de red, con asociación opcional al NSG.
+  - **`vm`**: máquina virtual Linux.
 
-![Archivo terraform.tfvars](images/Image3.png)
-
-- **`outputs.tf`**: Define las salidas de la IP pública de la VM y el comando SSH para conectarse.
-
-![Archivo outputs.tf](images/Image4.png)
-
-Esta organización de archivos garantiza la modularidad de la solución, lo permite parametrizar el despliegue y mantener la separación entre configuración y datos sensibles.
+Esta organización modular facilita el mantenimiento, la reutilización y la claridad del código, manteniendo separada la configuración de los valores sensibles.
 
 ### 2. Inicialización del entorno
 
